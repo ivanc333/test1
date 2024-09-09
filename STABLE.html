@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<!-- saved from url=(0041)file:///C:/Users/ivanc/Downloads/I.2.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I</title>
+    <script src="./STABLE1_files/jspdf.umd.min.js.download"></script>
+    <script src="./STABLE1_files/jspdf.plugin.autotable.min.js.download"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px;
+            font-size: 16px;
+            margin: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            border: none;
+            padding: 4px;
+        }
+        .table-container {
+            width: 100%;
+            overflow-x: auto; /* Horizontal scrolling for tables */
+        }
+        .button-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .hidden-column {
+            display: none;
+        }
+        .wide-column {
+            width: 40%;
+        }
+        .pdf-button-container {
+            text-align: right;
+        }
+        #filterDropdown {
+            width: 100%;
+            text-align: left;
+            margin: 10px;
+        }
+        .scrollable-container {
+            max-height: 60vh; /* Sets a max height for the scrollable area */
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        h1 {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Pesanan / kiriman VIP GPT HTML</h1>
+    
+    <textarea id="inputData" placeholder="Enter data separated by commas, one row per line..."></textarea><br>
+    <button onclick="updateTable()">Proceed</button>
+
+    <div id="filterDropdown">
+        <label><strong>Filter by Nomor Pesanan:</strong></label><br>
+        <div id="dropdownChecklist"></div>
+    </div>
+
+    <div class="table-container scrollable-container">
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th>Nomor Pesanan</th>
+                    <th>Untuk Penjualan</th>
+                    <th>Nama Barang</th>
+                    <th>Pending / Unit</th>
+                    <th>Nomor DO</th>
+                    <th>Batch (qty)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="table-container">
+        <div class="button-container">
+            <h2>To Be Printed</h2>
+            <button onclick="generateJKTSUB()">SUM</button>
+        </div>
+        <div class="scrollable-container">
+            <table id="jktSubTable">
+                <thead>
+                    <tr>
+                        <th class="hidden-column">Nomor Pesanan</th>
+                        <th class="hidden-column">Untuk Penjualan</th>
+                        <th class="wide-column">Nama Barang</th>
+                        <th>Pending / Unit</th>
+                        <th>Nomor DO</th>
+                        <th>Batch</th>
+                        <th></th> <!-- Added checkbox column -->
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="pdf-button-container">
+            <button onclick="generatePDF()">PDF</button>
+            <button onclick="checkQuantities()">Check</button>
+        </div>
+    </div>
+
+    <script>
+        let nomorPesananList = [];
+
+        function updateTable() {
+            let input = document.getElementById('inputData').value;
+            let rows = input.split('\n');
+
+            let tableBody = document.querySelector('#dataTable tbody');
+            tableBody.innerHTML = ''; // Clear existing table rows
+            nomorPesananList = []; // Reset the Nomor Pesanan list for checklist
+
+            rows.forEach(row => {
+                let columns = row.split(',').map(col => col.trim());
+                if (columns.length >= 4) {
+                    let tableRow = document.createElement('tr');
+                    columns.forEach((column, index) => {
+                        let tableCell = document.createElement('td');
+                        if (index === 3) {
+                            // Make "Pending / Unit" column editable
+                            tableCell.innerHTML = `<input type="text" value="${column}">`;
+                        } else {
+                            tableCell.textContent = column;
+                        }
+                        tableRow.appendChild(tableCell);
+                    });
+
+                    // Add new columns for "Nomor DO" and "Batch (qty)" with text inputs
+                    let nomorDOCell = document.createElement('td');
+                    nomorDOCell.innerHTML = '<input type="text" placeholder="Nomor DO">';
+                    tableRow.appendChild(nomorDOCell);
+
+                    let batchCell = document.createElement('td');
+                    batchCell.innerHTML = '<input type="text" placeholder="Batch (qty)">';
+                    tableRow.appendChild(batchCell);
+
+                    tableBody.appendChild(tableRow);
+
+                    // Add Nomor Pesanan to the checklist
+                    let nomorPesanan = columns[0];
+                    if (!nomorPesananList.includes(nomorPesanan)) {
+                        nomorPesananList.push(nomorPesanan);
+                    }
+                }
+            });
+
+            // Update the checklist dropdown
+            updateDropdownChecklist();
+        }
+
+        function updateDropdownChecklist() {
+            let checklistContainer = document.getElementById('dropdownChecklist');
+            checklistContainer.innerHTML = ''; // Clear the checklist
+
+            nomorPesananList.forEach(nomorPesanan => {
+                let checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = nomorPesanan;
+                checkbox.checked = true; // Default to checked
+
+                checkbox.addEventListener('change', filterTableRows); // Add filter function
+
+                let label = document.createElement('label');
+                label.textContent = nomorPesanan;
+
+                let listItem = document.createElement('div');
+                listItem.appendChild(checkbox);
+                listItem.appendChild(label);
+
+                checklistContainer.appendChild(listItem);
+            });
+        }
+
+        function filterTableRows() {
+            let checkedPesanan = Array.from(document.querySelectorAll('#dropdownChecklist input:checked'))
+                .map(checkbox => checkbox.value);
+
+            let tableRows = document.querySelectorAll('#dataTable tbody tr');
+            tableRows.forEach(row => {
+                let nomorPesanan = row.querySelector('td:nth-child(1)').textContent;
+                row.style.display = checkedPesanan.includes(nomorPesanan) ? '' : 'none';
+            });
+        }
+
+        function generateJKTSUB() {
+            let originalTableBody = document.querySelector('#dataTable tbody');
+            let jktSubTableBody = document.querySelector('#jktSubTable tbody');
+            jktSubTableBody.innerHTML = ''; // Clear existing JKTSUB rows
+
+            let rows = originalTableBody.querySelectorAll('tr');
+            rows.forEach(row => {
+                let nomorDOInput = row.querySelector('td:nth-child(5) input');
+                let batchInput = row.querySelector('td:nth-child(6) input').value;
+                
+                // Check if the "Nomor DO" field is not empty
+                if (nomorDOInput.value.trim() !== '') {
+                    let namaBarang = row.querySelector('td:nth-child(3)').textContent;
+                    let pendingUnit = row.querySelector('td:nth-child(4) input').value;
+                    
+                    // Check if batch input contains a batch pattern with numbers
+                    if (batchInput.match(/\d+\(\d+\)/)) {
+                        // Handle batch input with the defined format
+                        let batchRows = handleBatchInput(namaBarang, pendingUnit, nomorDOInput.value, batchInput);
+                        batchRows.forEach(newRow => {
+                            jktSubTableBody.appendChild(newRow); // Append processed rows
+                        });
+                    } else {
+                        // If no batch format, just copy the row as usual
+                        let newRow = document.createElement('tr');
+                        
+                        let namaBarangCell = document.createElement('td');
+                        namaBarangCell.textContent = namaBarang;
+                        newRow.appendChild(namaBarangCell);
+                        
+                        let pendingUnitCell = document.createElement('td');
+                        pendingUnitCell.textContent = pendingUnit;
+                        newRow.appendChild(pendingUnitCell);
+                        
+                        let nomorDOCell = document.createElement('td');
+                        nomorDOCell.textContent = nomorDOInput.value;
+                        newRow.appendChild(nomorDOCell);
+                        
+                        let batchCell = document.createElement('td');
+                        batchCell.textContent = batchInput; // Copy the entire batch input
+                        newRow.appendChild(batchCell);
+                        
+                        // Add a checkbox
+                        let checkboxCell = document.createElement('td');
+                        checkboxCell.innerHTML = '<input type="checkbox">';
+                        newRow.appendChild(checkboxCell);
+
+                        jktSubTableBody.appendChild(newRow);
+                    }
+                }
+            });
+        }
+
+
+        function handleBatchInput(namaBarang, pendingUnit, nomorDO, batchInput) {
+    let batchRows = [];
+    let batchData = batchInput.split(',').map(item => item.trim());
+
+    batchData.forEach(data => {
+        let batchNumber = data.match(/\d+/)[0]; // Extract batch number before parentheses
+        let batchQty = data.match(/\((\d+)\)/)[1]; // Extract quantity inside parentheses
+
+        let newRow = document.createElement('tr');
+
+        // Create and append cells with the required data
+        let namaBarangCell = document.createElement('td');
+        namaBarangCell.textContent = namaBarang;
+        newRow.appendChild(namaBarangCell);
+
+        let pendingUnitCell = document.createElement('td');
+        pendingUnitCell.textContent = batchQty; // Use the quantity from parentheses
+        newRow.appendChild(pendingUnitCell);
+
+        let nomorDOCell = document.createElement('td');
+        nomorDOCell.textContent = nomorDO;
+        newRow.appendChild(nomorDOCell);
+
+        let batchCell = document.createElement('td');
+        batchCell.textContent = batchNumber; // Show batch number only
+        newRow.appendChild(batchCell);
+
+        // Add a checkbox
+        let checkboxCell = document.createElement('td');
+        checkboxCell.innerHTML = '<input type="checkbox">';
+        newRow.appendChild(checkboxCell);
+
+        batchRows.push(newRow);
+    });
+
+    return batchRows;
+}
+
+function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    let today = new Date();
+    let formattedDate = today.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: '2-digit' });
+
+    doc.setFontSize(18);
+    doc.text('JKT to SUB tgl: ' + formattedDate, 10, 10);
+
+    // Extract the JKTSUB table data
+    doc.autoTable({
+        html: '#jktSubTable',
+        startY: 20,
+        theme: 'grid',
+        headStyles: {
+            fillColor: [255, 255, 255], // White fill for header
+            textColor: [0, 0, 0], // Black text color
+            fontStyle: 'bold' // Bold font for header
+        },
+        columnStyles: {
+            0: { cellWidth: 'auto' }, // Nama Barang column width (as wide as possible)
+            3: { cellWidth: '20%' },  // Pending / Unit column width (20%)
+            6: { cellWidth: 20 }      // Checkbox column width
+        }
+    });
+
+    doc.save('JKT_to_SUB.pdf');
+}
+
+
+function checkQuantities() {
+    // Helper function to parse numbers, returning 0 if parsing fails
+    function parseNumber(value) {
+        return isNaN(parseFloat(value)) ? 0 : parseFloat(value);
+    }
+
+    // Extract and aggregate data from the Proceed table
+    let proceedTableRows = document.querySelectorAll('#dataTable tbody tr');
+    let proceedData = {};
+
+    proceedTableRows.forEach(row => {
+        let namaBarang = row.querySelector('td:nth-child(3)').textContent.trim();
+        let pendingUnit = row.querySelector('td:nth-child(4) input').value.trim();
+
+        let pendingValue = parseNumber(pendingUnit);
+        if (pendingValue > 0) {
+            if (!proceedData[namaBarang]) {
+                proceedData[namaBarang] = 0;
+            }
+            proceedData[namaBarang] += pendingValue;
+        }
+    });
+
+    // Extract and aggregate data from the JKTSUB table
+    let jktSubTableRows = document.querySelectorAll('#jktSubTable tbody tr');
+    let jktSubData = {};
+
+    jktSubTableRows.forEach(row => {
+        let namaBarang = row.querySelector('td:nth-child(1)').textContent.trim();
+        let pendingUnit = row.querySelector('td:nth-child(2)').textContent.trim();
+
+        let pendingValue = parseNumber(pendingUnit);
+        if (pendingValue > 0) {
+            if (!jktSubData[namaBarang]) {
+                jktSubData[namaBarang] = 0;
+            }
+            jktSubData[namaBarang] += pendingValue;
+        }
+    });
+
+    // Compare aggregated sums
+    let warnings = [];
+
+    for (let item in jktSubData) {
+        let jktSubSum = jktSubData[item];
+        let proceedSum = proceedData[item] || 0;
+
+        if (jktSubSum > proceedSum) {
+            warnings.push(`Please check: '${item}' - JKTSUB sum (${jktSubSum}) is greater than Proceed table sum (${proceedSum}).`);
+        }
+    }
+
+    if (warnings.length > 0) {
+        alert(warnings.join('\n'));
+    } else {
+        alert('No error: All quantities are correct.');
+    }
+}
+
+    </script>
+
+
+
+</body></html>
